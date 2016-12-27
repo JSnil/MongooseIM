@@ -54,7 +54,7 @@
 
 %%private
 -export([archive_message/8]).
--export([lookup_messages/13]).
+-export([lookup_messages/14]).
 -export([archive_id_int/2]).
 
 %% for feature (escalus) tests
@@ -480,6 +480,7 @@ handle_lookup_messages(
     Start = elem_to_start_microseconds(QueryEl),
     End   = elem_to_end_microseconds(QueryEl),
     %% Filtering by contact.
+    SearchText = undefined,
     With  = elem_to_with_jid(QueryEl),
     RSM   = fix_rsm(jlib:rsm_decode(QueryEl)),
     Borders = borders_decode(QueryEl),
@@ -489,7 +490,7 @@ handle_lookup_messages(
     LimitPassed = Limit =/= <<>>,
     IsSimple = decode_optimizations(QueryEl),
     case lookup_messages(Host, ArcID, ArcJID, RSM, Borders,
-                         Start, End, Now, With,
+                         Start, End, Now, With, SearchText,
                          PageSize, LimitPassed, max_result_limit(), IsSimple) of
     {error, 'policy-violation'} ->
         ?DEBUG("Policy violation by ~p.", [jid:to_binary(From)]),
@@ -876,7 +877,6 @@ elem_to_end_microseconds(El) ->
 -spec elem_to_with_jid(jlib:xmlel()) -> 'error' | 'undefined' | ejabberd:jid().
 elem_to_with_jid(El) ->
     maybe_jid(xml:get_path_s(El, [{elem, <<"with">>}, cdata])).
-
 
 %% @doc This element's name is "limit". But it must be "max" according XEP-0313.
 -spec elem_to_limit(any()) -> any().

@@ -32,7 +32,7 @@
 
 -export([archive_message/9,
          archive_message_muc/9,
-         lookup_messages/14,
+         lookup_messages/15,
          lookup_messages_muc/14]).
 
 -export([key/3]).
@@ -145,7 +145,7 @@ maybe_muc_jid(Other) ->
 
 lookup_messages({error, _Reason} = Result, _Host,
                      _UserID, _UserJID, _RSM, _Borders,
-                     _Start, _End, _Now, _WithJID,
+                     _Start, _End, _Now, _WithJID, _SearchText,
                      _PageSize, _LimitPassed, _MaxResultLimit,
                      _IsSimple) ->
                      Result;
@@ -177,7 +177,7 @@ lookup_messages_muc(Result, Host,
     WithJIDMuc = maybe_muc_jid(WithJID),
     lookup_messages(Result, Host,
                     UserID, UserJID, RSM, Borders,
-                    Start, End, _Now, WithJIDMuc,
+                    Start, End, _Now, WithJIDMuc, undefined,
                     PageSize, LimitPassed, MaxResultLimit,
                     IsSimple).
 
