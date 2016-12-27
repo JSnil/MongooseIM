@@ -113,7 +113,8 @@
 -include_lib("ejabberd/include/amp.hrl").
 -include_lib("exml/include/exml.hrl").
 
-%% ----------------------------------------------------------------------
+%% ---------------------------------------------------
+%% -------------------
 %% Datetime types
 %% Microseconds from 01.01.1970
 -type unix_timestamp() :: non_neg_integer().
