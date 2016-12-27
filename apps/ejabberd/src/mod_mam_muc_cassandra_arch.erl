@@ -231,7 +231,7 @@ remove_archive_offsets_query_cql() ->
     "DELETE FROM mam_muc_message_offset WHERE room_jid = ? AND with_nick = ?".
 
 select_for_removal_query_cql() ->
-    "SELECT DISTINCT room_jid, with_nick FROM mam_message WHERE room_jid = ?".
+    "SELECT DISTINCT room_jid, with_nick FROM mam_muc_message WHERE room_jid = ?".
 
 remove_archive(_Host, _RoomID, RoomJID) ->
     BRoomJID = bare_jid(RoomJID),
@@ -690,8 +690,12 @@ offset_to_start_id(PoolName, RoomJID, Filter, Offset) when is_integer(Offset), O
 %% This function returns given StartId as passthrough for convenience
 -spec maybe_save_offset_hint(PoolName :: mongoose_cassandra:pool_name(), RoomJID :: jlib:jid(),
                              Filter :: filter(), HintOffset :: non_neg_integer(),
-                             NewOffset :: non_neg_integer(), StartId :: non_neg_integer()) ->
-                                    StartId :: non_neg_integer().
+                             NewOffset :: non_neg_integer(),
+                             StartId :: non_neg_integer() | undefined) ->
+    StartId :: non_neg_integer() | undefined.
+maybe_save_offset_hint(_PoolName, _UserJID, _Filter, _HintOffset, _NewOffset,
+                       StartId = undefined) ->
+    StartId;
 maybe_save_offset_hint(PoolName, RoomJID, Filter, HintOffset, NewOffset, StartId) ->
     case abs(NewOffset - HintOffset) > 50 of
         true ->
@@ -719,7 +723,7 @@ calc_offset_to_start_id(PoolName, RoomJID, Filter, Offset) when is_integer(Offse
     Params = eval_filter_params(Filter) ++ [{'[limit]', Offset + 1}],
     {ok, RowsIds} = mongoose_cassandra:cql_read(PoolName, RoomJID, ?MODULE, QueryName, Params),
     case RowsIds of
-        [] -> unfefined;
+        [] -> undefined;
         [_ | _] ->
             proplists:get_value(id, lists:last(RowsIds))
     end.

@@ -63,7 +63,7 @@
           user_jid :: binary(),
           remote_jid :: binary(),
           from_jid :: binary(),
-          with_jid :: binary(),
+          with_jid = <<>> :: binary(),
           message :: binary()
          }).
 
@@ -262,7 +262,7 @@ message_id_to_remote_jid_cql() ->
         "WHERE user_jid = ? AND with_jid = '' AND id = ? ALLOW FILTERING".
 
 message_id_to_remote_jid(PoolName, UserJID, BUserJID, MessID) ->
-    Params = [{user_jid, BUserJID}, {id, MessID}],
+    Params = [{user_jid, BUserJID}, {id, MessID}, {with_jid, <<>>}],
     {ok, Rows} = mongoose_cassandra:cql_read(PoolName, UserJID, ?MODULE,
                                              message_id_to_remote_jid_query, Params),
     case Rows of
@@ -692,8 +692,12 @@ offset_to_start_id(PoolName, UserJID, Filter, Offset) when is_integer(Offset), O
 %% This function returns given StartId as passthrough for convenience
 -spec maybe_save_offset_hint(PoolName :: mongoose_cassandra:pool_name(), UserJID :: jlib:jid(),
                              Filter :: filter(), HintOffset :: non_neg_integer(),
-                             NewOffset :: non_neg_integer(), StartId :: non_neg_integer()) ->
-                                    StartId :: non_neg_integer().
+                             NewOffset :: non_neg_integer(),
+                             StartId :: non_neg_integer() | undefined) ->
+    StartId :: non_neg_integer() | undefined.
+maybe_save_offset_hint(_PoolName, _UserJID, _Filter, _HintOffset, _NewOffset,
+                       StartId = undefined) ->
+    StartId;
 maybe_save_offset_hint(PoolName, UserJID, Filter, HintOffset, NewOffset, StartId) ->
     case abs(NewOffset - HintOffset) > 50 of
         true ->
@@ -720,7 +724,7 @@ calc_offset_to_start_id(PoolName, UserJID, Filter, Offset) when is_integer(Offse
     Params = eval_filter_params(Filter) ++ [{'[limit]', Offset + 1}],
     {ok, RowsIds} = mongoose_cassandra:cql_read(PoolName, UserJID, ?MODULE, QueryName, Params),
     case RowsIds of
-        [] -> unfefined;
+        [] -> undefined;
         [_ | _] ->
             proplists:get_value(id, lists:last(RowsIds))
     end.

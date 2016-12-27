@@ -27,9 +27,10 @@
 %% ====================================================================
 
 -type row() :: proplists:proplist().
--type row_fold_fun() :: fun((Row :: row(), AccIn :: term()) -> AccOut :: term()).
+-type row_fold_fun() :: fun((Page :: [row()], AccIn :: term()) -> AccOut :: term()).
 -type pool_name() :: atom().
 -type cql_query() :: #cql_query{}.
+-type query_name() :: atom() | {atom(), atom()}.
 
 %% ====================================================================
 %% Exports
@@ -47,7 +48,7 @@
 -export([test_query/1, test_query/2, total_count_query/2]).
 
 %% Types
--export_type([pool_name/0, row/0]).
+-export_type([pool_name/0, row/0, query_name/0]).
 
 %% Callbacks definitions
 -callback prepared_queries() -> list({term(), string()}).
@@ -112,7 +113,7 @@ now_to_usec({MSec, Sec, USec}) ->
 %% Cassandra rejects the query due to its size being to big.
 %% --------------------------------------------------------
 -spec cql_write(PoolName :: pool_name(), UserJID :: jid(), Module :: atom(),
-                QueryName :: atom() |{atom(), atom()}, Rows :: [proplists:proplist()]) ->
+                QueryName :: query_name(), Rows :: [proplists:proplist()]) ->
                        ok | {error, Reason :: any()}.
 cql_write(PoolName, _UserJID, Module, QueryName, Rows)  ->
     QueryStr = proplists:get_value(QueryName, Module:prepared_queries()),
@@ -127,7 +128,7 @@ cql_write(PoolName, _UserJID, Module, QueryName, Rows)  ->
 %% be exceeded like in cql_write/5.
 %% --------------------------------------------------------
 -spec cql_write_async(PoolName :: pool_name(), UserJID :: jid(), Module :: atom(),
-                      QueryName :: atom() |{atom(), atom()}, Rows :: [proplists:proplist()]) ->
+                      QueryName :: query_name(), Rows :: [proplists:proplist()]) ->
                              ok | {error, Reason :: any()}.
 cql_write_async(PoolName, UserJID, Module, QueryName, Rows)  ->
     QueryStr = proplists:get_value(QueryName, Module:prepared_queries()),
@@ -154,14 +155,14 @@ cql_write_async(PoolName, UserJID, Module, QueryName, Rows)  ->
 %% @doc Execute read query to cassandra (select).
 %% Returns all rows at once even if there are several query pages.
 %% --------------------------------------------------------
--spec cql_read(PoolName :: pool_name(), UserJID :: jid(), Module :: atom(),
-               QueryName :: atom() | {atom(), atom()}, Params :: proplists:proplist()) ->
+-spec cql_read(PoolName :: pool_name(), UserJID :: jid() | undefined, Module :: atom(),
+               QueryName :: query_name(), Params :: proplists:proplist()) ->
                       {ok, Rows :: [proplists:proplist()]} | {error, Reason :: any()}.
 cql_read(PoolName, UserJID, Module, QueryName, Params)  ->
-    Fun = fun(Row, Acc) -> [Row | Acc] end,
+    Fun = fun(Page, Acc) -> [Page | Acc] end,
     case cql_foldl(PoolName, UserJID, Module, QueryName, Params, Fun, []) of
         {ok, Rows} ->
-            {ok, lists:concat(lists:reverse(Rows))};
+            {ok, lists:append(lists:reverse(Rows))};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -173,12 +174,17 @@ cql_read(PoolName, UserJID, Module, QueryName, Params)  ->
 %% query. Therefore each execution of given fun gets list of several result rows (by default 100 at
 %% most).
 %% --------------------------------------------------------
--spec cql_foldl(PoolName :: pool_name(), UserJID :: jid(), Module :: atom(),
-                QueryName :: atom() | {atom(), atom()}, Params :: proplists:proplist(),
+-spec cql_foldl(PoolName :: pool_name(), UserJID :: jid() | undefined, Module :: atom(),
+                QueryName :: query_name(), Params :: proplists:proplist(),
                 row_fold_fun(), AccIn :: term()) ->
                        {ok, AccOut :: term()} | {error, Reason :: any()}.
 cql_foldl(PoolName, UserJID, Module, QueryName, Params, Fun, AccIn)  ->
     cql_foldl(PoolName, UserJID, Module, QueryName, Params, Fun, AccIn, 3).
+
+-spec cql_foldl(PoolName :: pool_name(), UserJID :: jid() | undefined, Module :: atom(),
+                QueryName :: query_name(), Params :: proplists:proplist(),
+                row_fold_fun(), AccIn :: term(), TryCount :: non_neg_integer()) ->
+                   {ok, AccOut :: term()} | {error, Reason :: any()}.
 cql_foldl(_PoolName, _UserJID, _Module, QueryName, Params, _Fun, _AccIn, 0)  ->
     {error, {query_timeout, QueryName, Params}};
 cql_foldl(PoolName, UserJID, Module, QueryName, Params, Fun, AccIn, TryCount)  ->
